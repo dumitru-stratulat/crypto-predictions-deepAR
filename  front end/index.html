@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="currency_data.js"></script>
+    <script src="sentiment_data.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <style></style>
+</head>
+
+<body>
+    <img class="cryptooLogo" src="./images/bitcoin.png" alt="">
+    <div class="cryptoChart" id="BTC" style="width:1200px;height:400px;"></div>
+    <div id="pieChartBTC" style="width:500;height:400px;"></div>
+    <img class="cryptooLogo" src="./images/cardano.png" alt="">
+    <div  class="cryptoChart" id="ADA" style="width:1200px;height:400px;"></div>
+    <div id="pieChartADA" style="width:500;height:400px;"></div>
+    <img class="cryptooLogo" src="./images/eth.png" alt="">
+    <div class="cryptoChart" id="ETH" style="width:1200px;height:400px;"></div>
+    <div id="pieChartETH" style="width:500;height:400px;"></div>
+    <img class="cryptooLogo" src="./images/dogecoin.png" alt="">
+    <div  class="cryptoChart" id="DOGE" style="width:1200px;height:400px;"></div>
+    <div id="pieChartDOGE" style="width:500;height:400px;"></div>
+    <img class="cryptooLogo" src="./images/polygon.png" alt="">
+    <div  class="cryptoChart" id="MATIC" style="width:1200px;height:400px;"></div>
+    <div id="pieChartMATIC" style="width:500;height:400px;"></div>
+    <script>
+        //Open connection
+        let connection = new WebSocket("wss://4zdyw4q7f9.execute-api.us-east-1.amazonaws.com/prod");
+        let arrayOfCurrency = ["BTC", "ETH", "ADA", "DOGE", "MATIC"];
+        //Log connected response
+        connection.onopen = function (event) {
+            console.log("Connected: " + JSON.stringify(event));
+            getData();
+
+        };
+        //all data coming from server will concatinate and store
+        var concatinatedCryptoData = [];
+        //Handling messages from the server
+        connection.onmessage = function (msg) {
+            var cryptoData = NaN;
+            //cryptodataa
+            const data = JSON.parse(msg.data).cryptoData;
+            //sentimenta data
+            const sentimentData = JSON.parse(msg.data).sentimentArray;
+            //prediction data
+            var cryptoPredictionArray = JSON.parse(msg.data).cryptoPredictionArray;
+            if(sentimentData)
+                displayPieChart(sentimentData);
+                cryptoData = data;
+                //sorting by time
+                cryptoData.sort(function (x, y) {
+                    return x.CryptoTS - y.CryptoTS;
+                })
+            concatinatedCryptoData = concatinatedCryptoData.concat(cryptoData);
+            //if data coming from websocket message, else coming from get data webscocket
+            if(JSON.parse(msg.data).functionName == "wsMessage"){
+                let wsCryptoData;
+                //filter specific data crypto that we need
+                const specificCryptoData = concatinatedCryptoData.filter(cryptoRecord => cryptoRecord.CurrencySymbol == cryptoData[0].CurrencySymbol);
+                //sorting once again to make sure all data concatinated sorted to insert in graph
+                specificCryptoData.sort(function (x, y) {
+                    return x.CryptoTS - y.CryptoTS;
+                })
+                //plot concatinated data, or data when new data appears in db
+                plotData(specificCryptoData, cryptoPredictionArray, specificCryptoData[0].CurrencySymbol);
+            }else{
+                //plot data when accessing or refreshing page
+                plotData(cryptoData, cryptoPredictionArray, cryptoData[0].CurrencySymbol);
+            }
+            // setInterval(plotData, 2000);
+        }
+
+        //Log errors
+        connection.onerror = function (error) {
+            console.log("WebSocket Error: " + JSON.stringify(error));
+        }
+  
+        function getData() {
+            //Send message to server
+            //Create message to be sent to server
+            //ask for data for every currency
+            arrayOfCurrency.forEach(element => {
+                connection.send(JSON.stringify({
+                    action: "getData",//Used for routing in API Gateway
+                    currency: element
+                }));
+            });
+        }
+        //generate graph
+        function plotData(cryptoData, cryptoPredictionArray, currencyName) {
+            //Get test data
+            if (cryptoData) {
+                //Specify how chart should be drawn
+                let trace = {
+                    x: [],
+                    y: [],
+                    mode: 'line',
+                    name: currencyName,
+                    marker: {
+                        color: 'rgb(219, 64, 82)',
+                        size: 12
+                    }
+                };
+                //inserting in trace object data we need,ex. price and time
+                cryptoData.forEach(data => {
+                    let date = new Date(data.CryptoTS);
+                    trace.x.push(date);
+                    trace.y.push(data.ClosePrice);
+
+                })
+                //second line for prediction data
+                let trace2 = {
+                    x: [],
+                    y: [],
+                    mode: 'line',
+                    name: "Prediction on "+currencyName,
+                    marker: {
+                        color: 'rgb(31, 81, 255)',
+                        size: 12
+                    }
+                };
+                 //inserting in trace object data we need,ex. price and time
+                cryptoPredictionArray.map((data, index) => {
+                    // console.log(index)
+                    trace2.y.push(data.ClosePrice);
+                    trace2.x.push(new Date(cryptoData[cryptoData.length-1].CryptoTS + ((index + 1) * 3600 * 1000 * 24)))
+                })
+
+                //Get reference to Div where chart will be drawn
+                let chartDiv = document.getElementById(currencyName);
+                //Set up graph layout
+                let layout = {
+                    title: currencyName,
+                    xaxis: {
+                        title: 'Time'
+                    },
+                    yaxis: {
+                        title: 'Price'
+                    },
+                    plot_bgcolor:"transparent",
+                    paper_bgcolor:"transparent",
+                    font: {
+      family: 'Arial',
+      size: 16,
+      color: '#ccc'
+    }
+                };
+
+                //Data for graph is arrays of lines for graph
+                let data = [trace, trace2];
+                //Plot data
+                Plotly.newPlot(chartDiv, data, layout);
+                return;
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,17 @@
+body{
+    background-color: black;
+}
+.cryptoChart,.cryptooLogo{
+    width: 200px;
+    height: 100px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  
+}
+.cryptoChart{
+    -webkit-box-shadow: -1px 2px 165px 8px rgba(30,92,199,0.91);
+-moz-box-shadow: -1px 2px 165px 8px rgba(30,92,199,0.91);
+box-shadow: -1px 2px 165px 8px rgba(30,92,199,0.91);
+border-radius: 30px;
+}
